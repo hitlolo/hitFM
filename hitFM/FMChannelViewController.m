@@ -69,11 +69,15 @@
     if([self presentedViewController] != nil){
         return;
     }
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"失败" message:message preferredStyle:UIAlertControllerStyleAlert];
-    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"ok" style:UIAlertActionStyleCancel handler:nil];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"失败"
+                                                                   message:message
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"ok"
+                                                           style:UIAlertActionStyleCancel
+                                                         handler:nil];
     [alert addAction:cancelAction];
     [self presentViewController:alert animated:YES completion:^{
-        [self.mainVC revealChannel];
+        //[self.mainVC revealChannel];
     }];
     
 //    [_mainVC networkFailHandler](nil,nil);
@@ -123,20 +127,27 @@
 
 
 - (void)showRedHeartAlert{
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"红心" message:@"需要登录以使用添加红心功能。" preferredStyle:UIAlertControllerStyleActionSheet];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"红心"
+                                                                   message:@"需要登录以使用添加红心功能。"
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
     
-    UIAlertAction *cancel = [UIAlertAction actionWithTitle:@"暂不登录" style:UIAlertActionStyleCancel handler:^void(UIAlertAction * _Nonnull action)
-                             {
-                                 NSLog(@"%@ handled",action);
-                             }];
+    UIAlertAction *cancel = [UIAlertAction actionWithTitle:@"暂不登录"
+                                                     style:UIAlertActionStyleCancel
+                                                   handler:^void(UIAlertAction * _Nonnull action)
+                                                    {
+                                                        NSLog(@"%@ handled",action);
+                                                    }];
     [alert addAction:cancel];
     
-    UIAlertAction *login = [UIAlertAction actionWithTitle:@"去登录" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action)
+    UIAlertAction *login = [UIAlertAction actionWithTitle:@"去登录"
+                                                    style:UIAlertActionStyleDefault
+                                                  handler:^(UIAlertAction * _Nonnull action)
                             {
                                 UIStoryboard* sb = [UIStoryboard storyboardWithName:@"Main" bundle:[NSBundle mainBundle]];
                                 UIViewController *vc = [sb instantiateViewControllerWithIdentifier:@"test"];
                                 [self presentViewController:vc animated:YES completion:nil];
                             }];
+    
     [alert addAction:login];
     [self presentViewController:alert animated:YES completion:nil];
 }

@@ -9,7 +9,7 @@
 #import <Foundation/Foundation.h>
 #import "FMChannelDetail.h"
 
-@protocol DataReload <NSObject>
+@protocol LoadDataDelegate <NSObject>
 
 - (void)reloadData;
 - (void)reloadDataFail:(NSString*)message;
@@ -25,7 +25,7 @@ enum
 };
 @interface FMChannel : NSObject
 
-@property (weak, nonatomic) id<DataReload>           delegate;
+@property (weak, nonatomic) id<LoadDataDelegate>     delegate;
 @property (strong, nonatomic) NSMutableArray        *channelSections;
 @property (strong, nonatomic) NSArray<NSString*>    *channelSectionTitles;
 

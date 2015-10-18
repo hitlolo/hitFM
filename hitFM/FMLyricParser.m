@@ -57,10 +57,10 @@
             
          }
          else{
-             self.timeArray = lyricDic[@"time"];
-             self.lyricArray = lyricDic[@"lyric"];
-             self.timeLyricDic = lyricDic[@"timeLyric"];
-             self.startIndex = 0; //reset search index start from 0;
+             self.timeArray = lyricDic[@"time"];         // 时间戳
+             self.lyricArray = lyricDic[@"lyric"];       // 时间戳对应歌词句
+             self.timeLyricDic = lyricDic[@"timeLyric"]; // 以time-lyric为键值的字典
+             self.startIndex = 0; //reset search index start to 0;
 
          }
         
@@ -70,6 +70,13 @@
 
 }
 
+/**
+ *  歌词解析
+ *
+ *  @param responseData 获取的响应数据
+ *
+ *  @return 解析后的字典
+ */
 - (NSDictionary*)parseLyric:(id)responseData{
 
     
@@ -77,9 +84,9 @@
         return nil;
     }
     
-    NSMutableArray *timeArray = [[NSMutableArray alloc]init];
-    NSMutableArray *lyricArray = [[NSMutableArray alloc]init];
-    NSMutableDictionary *timeLyricDic = [[NSMutableDictionary alloc]init];
+    NSMutableArray *timeArray = [[NSMutableArray alloc]init];               //装时间戳
+    NSMutableArray *lyricArray = [[NSMutableArray alloc]init];              //歌词
+    NSMutableDictionary *timeLyricDic = [[NSMutableDictionary alloc]init];  //对应字典
  
     NSDictionary *lyricDic = @{
                                @"time" : timeArray,
@@ -88,22 +95,18 @@
                                };
     
  
-//    NSDictionary* responseJSON = [NSJSONSerialization JSONObjectWithData:responseData options:NSJSONReadingMutableLeaves error:nil];
-//    NSData* data = [responseData dataUsingEncoding:NSUTF8StringEncoding];
-//    NSDictionary *responseJSON = [NSJSONSerialization JSONObjectWithData:responseData
-//                                                                options:NSJSONReadingMutableLeaves error:nil];
     NSDictionary* responseJSON = (NSDictionary*)responseData;
     
     // empty test
     NSString* lyricString = responseJSON[@"lyric"];
-    NSLog(@"歌词:%@",lyricString);
+    // 没有歌词
     if (lyricString == nil || [lyricString isEqualToString:@""]) {
         self.lyricType = LyricEmpty;
         return nil;
     }
     //time line test
     if (![self hasTimeline:lyricString]) {
-        NSLog(@"has no timeline");
+       
         self.lyricType = LyricNoTimeline;
         
         // add caution info
@@ -113,7 +116,6 @@
         [lyricArray addObject:title];
         
         // then lyrics
-        
         NSArray*  lyricComponents = [lyricString componentsSeparatedByString:@"\n"];
         for (NSString* lyricComponent in lyricComponents) {
             
@@ -128,9 +130,11 @@
         return lyricDic;
     }
     
-    self.lyricType = LyricNormal;
-    // normal lyric
     
+    
+    
+    // normal lyric
+    self.lyricType = LyricNormal;
     // title first
     NSString* title = responseJSON[@"name"];
     NSTimeInterval time = 0;
@@ -200,10 +204,8 @@
 
 - (NSTimeInterval)getTime:(NSString*)timeContent{
     
-    
+    //00:00.00
     if ([timeContent length] == 8) {
-        
-       
         
         NSString *      regex = @"\\d{2}[:]\\d{2}[:/.]\\d{2}";
         NSPredicate *   pred = [NSPredicate predicateWithFormat:@"SELF MATCHES %@", regex];
@@ -221,6 +223,7 @@
         
         return time;
     }
+    //00:00
     else if ([timeContent length] == 5) {
         
         NSString *      regex = @"\\d{2}[:/.]\\d{2}";
@@ -315,7 +318,7 @@
     FMLyricCell *cell = [tableView dequeueReusableCellWithIdentifier:cellIdentifier];
     cell.selectionStyle = UITableViewCellSelectionStyleNone;//该表格选中后没有颜色
     cell.backgroundColor = [UIColor clearColor];
-    
+        
 
     if (self.lyricType == LyricNormal) {
         cell.lyrciLabel.text = self.timeLyricDic[self.timeArray[indexPath.row]];
@@ -324,7 +327,7 @@
         cell.lyrciLabel.text = self.lyricArray[indexPath.row];
     }
     
-    if (indexPath.row == _highlightIndex) {
+    if (indexPath.row == _highlightIndex ) {
         
         
         cell.lyrciLabel.textColor = [UIColor whiteColor];

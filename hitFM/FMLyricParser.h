@@ -8,13 +8,11 @@
 
 #import <Foundation/Foundation.h>
 
-typedef NS_ENUM(NSInteger, LyricType) {
-    
+typedef NS_ENUM(NSInteger, LyricType) {    
     LyricError = 0,
     LyricEmpty,
     LyricNormal,
     LyricNoTimeline
-    
 };
 
 @class FMSong;

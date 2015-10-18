@@ -326,7 +326,7 @@
 		CE5EF34C1BA2AF44004EE01B /* hitFM */ = {
 			isa = PBXGroup;
 			children = (
-				CE61E1DD1BA5CC7800BAA11D /* Define */,
+				CE61E1DD1BA5CC7800BAA11D /* URLConstants */,
 				CE6A94111BA45EF3003DA4B4 /* Sections */,
 				CE6A940C1BA45A41003DA4B4 /* Vendors */,
 				CE5EF3731BA2AF5B004EE01B /* AppDelegate */,
@@ -382,13 +382,13 @@
 			name = Channel;
 			sourceTree = "<group>";
 		};
-		CE61E1DD1BA5CC7800BAA11D /* Define */ = {
+		CE61E1DD1BA5CC7800BAA11D /* URLConstants */ = {
 			isa = PBXGroup;
 			children = (
 				CE61E1DE1BA5D0C900BAA11D /* FMConstants.h */,
 				CE61E1DF1BA5D0EA00BAA11D /* FMConstants.m */,
 			);
-			name = Define;
+			name = URLConstants;
 			sourceTree = "<group>";
 		};
 		CE63EB011BB13CB900016AD5 /* Song */ = {

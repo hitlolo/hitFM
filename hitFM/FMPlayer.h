@@ -16,21 +16,14 @@
 
 @interface FMPlayer : NSObject
 
-@property (strong, nonatomic) FMUser                    *user;
-@property (strong, nonatomic) FMPlaylist                *playlist;
-
-
-@property (strong, nonatomic) FMSong                    *currentSong;
-@property (strong, nonatomic) FMChannelDetail           *currentChannel;
-
-@property (strong, nonatomic) DOUAudioStreamer          *streamer;
-
+@property (strong, nonatomic) FMUser                     *user;
+@property (strong, nonatomic) FMPlaylist                 *playlist;
+@property (strong, nonatomic) FMSong                     *currentSong;
+@property (strong, nonatomic) FMChannelDetail            *currentChannel;
 @property (unsafe_unretained, nonatomic)NSTimeInterval   currentTime;
 
-@property (unsafe_unretained, readonly, getter = isPaused)BOOL isPaused;
 
-@property (copy, nonatomic) void (^networkFailHandler)(AFHTTPRequestOperation*,NSError*);
-
+//action
 - (void)startAfterLauchWithErrorHandler:(void (^)(AFHTTPRequestOperation *operation, NSError *error))erroHandler;
 - (void)retryConnection;
 - (void)pause;
@@ -38,8 +31,12 @@
 - (void)banSong;
 - (void)skipSong;
 - (void)nextSong;
+//state
+- (BOOL)isPaused;
+- (BOOL)isPlaying;
+//user
 - (void)archiverUser;
 - (void)loadArchiveredUser;
-- (BOOL)isPlaying;
+
 
 @end

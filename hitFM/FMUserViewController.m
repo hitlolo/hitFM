@@ -43,7 +43,7 @@
     FMMainViewController* mainVC = (FMMainViewController*)([self revealViewController].frontViewController);
     
     channelVC.player = mainVC.player;
-    channelVC.mainVC = mainVC;
+    
 }
 
 

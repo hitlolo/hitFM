@@ -10,12 +10,11 @@
 #import "FMChannel.h"
 @class FMPlayer;
 @class FMChannel;
-@class FMMainViewController;
 @interface FMChannelViewController : UITableViewController
-<DataReload>
+<LoadDataDelegate>
 
 @property (strong, nonatomic)FMChannel* channel;
 @property (weak, nonatomic)FMPlayer *player;
-@property (weak, nonatomic)FMMainViewController *mainVC;
+
 
 @end

@@ -68,13 +68,15 @@
      */
     NSDictionary *parameters = @{
                                  @"from":@"mainsite",
-                                 @"type":@"n",
+                                 @"type":@"p",
                                  @"channel":channel.channelID,
                                  @"sid":song.songID
                                  };
+    //NSLog(@"%@,%@",base_url,parameters);
     [httpManager setResponseSerializer:[AFJSONResponseSerializer serializer]];
     [httpManager GET:base_url parameters:parameters success:^(AFHTTPRequestOperation *operation, id responseObject)
     {
+        //NSLog(@"%@",responseObject);
         NSArray* songArr = [responseObject objectForKey:@"song"];
         self.song = [[FMSong alloc]initWithDictionary:songArr[0]];
     }

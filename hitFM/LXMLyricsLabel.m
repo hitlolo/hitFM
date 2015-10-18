@@ -80,6 +80,8 @@
     [self.maskLayer addAnimation:animation forKey:@"kLyrcisAnimation"];
 }
 
+
+
 - (void)stopAnimation {
     [self.maskLayer removeAllAnimations];
 }

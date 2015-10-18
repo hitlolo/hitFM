@@ -18,12 +18,10 @@ static void *kDurationKVOKey       = &kDurationKVOKey;
 static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 
 
-@interface FMPlayer(){
- 
-@private
-    //DOUAudioStreamer *_streamer;
-   // DOUAudioVisualizer *_audioVisualizer;
-}
+@interface FMPlayer()
+
+@property (strong, nonatomic) DOUAudioStreamer *streamer;
+@property (copy, nonatomic) void (^networkFailHandler)(AFHTTPRequestOperation*,NSError*);
 
 @end
 
@@ -32,31 +30,13 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
 
 
 
-- (instancetype)init{
-    self = [super init];
-    if (self) {
-//        FMSong * song = [[FMSong alloc]init];
-//        song.songUrl = @"http://mr7.doubanio.com/8b98492ca89e9e2912df36436a9ed374/0/fm/song/p617292_128k.mp4";
-//        _streamer = [DOUAudioStreamer streamerWithAudioFile:song];
-//        [_streamer addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:kStatusKVOKey];
-        
-//        [_streamer addObserver:self forKeyPath:@"bufferingRatio" options:NSKeyValueObservingOptionNew context:kBufferingRatioKVOKey];
-//        [_streamer play];
-        
-        //_audioVisualizer = [[DOUAudioVisualizer alloc] init];
-        //[_audioVisualizer setBackgroundColor:[UIColor colorWithRed:239.0 / 255.0 green:244.0 / 255.0 blue:240.0 / 255.0 alpha:1.0]];
-        
-    }
-    return self;
-}
-
-
 #pragma mark- DOU streamer start playing
 
 - (void)startAfterLauchWithErrorHandler:(void (^)(AFHTTPRequestOperation *operation, NSError *error))erroHandler{
     
     [self loadArchiveredUser];
     self.networkFailHandler = erroHandler;
+    // 频道初始化为id=0 公共频道
     self.currentChannel = [[FMChannelDetail alloc]init];
     self.playlist = [[FMPlaylist alloc]init];
     [self.playlist getNewSongByNormalWithChannel:self.currentChannel WithErrorhandler:erroHandler];
@@ -115,47 +95,9 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     }
     _streamer = [DOUAudioStreamer streamerWithAudioFile:self.currentSong];
     [_streamer addObserver:self forKeyPath:@"status" options:NSKeyValueObservingOptionNew context:kStatusKVOKey];
-    NSLog(@"songid:%@,songSSID:%@",self.currentSong.songID,self.currentSong.songSSID);
+    //NSLog(@"songid:%@,songSSID:%@",self.currentSong.songID,self.currentSong.songSSID);
     [_streamer play];
 }
-
-
-
-
-
-- (void)updateStreamerStatus{
-    
-    switch ([_streamer status]) {
-        case DOUAudioStreamerPlaying:
-            NSLog(@"playinh");
-            break;
-            
-        case DOUAudioStreamerPaused:
-               NSLog(@"paused");
-            break;
-            
-        case DOUAudioStreamerIdle:
-               NSLog(@"idle");
-            break;
-            
-        case DOUAudioStreamerFinished:
-            NSLog(@"finished");
-            [self nextSong];
-            break;
-            
-        case DOUAudioStreamerBuffering:
-               NSLog(@"buffering");
-            break;
-            
-        case DOUAudioStreamerError:
-               NSLog(@"error");
-            break;
-    }
-
-}
-
-
-
 
 - (void)pause{
     [_streamer pause];
@@ -215,8 +157,41 @@ static void *kBufferingRatioKVOKey = &kBufferingRatioKVOKey;
     //        NSLog(@"buffering");
     //    }
     
+}
+
+
+- (void)updateStreamerStatus{
+    
+    switch ([_streamer status]) {
+        case DOUAudioStreamerPlaying:
+            NSLog(@"playinh");
+            break;
+            
+        case DOUAudioStreamerPaused:
+            NSLog(@"paused");
+            break;
+            
+        case DOUAudioStreamerIdle:
+            NSLog(@"idle");
+            break;
+            
+        case DOUAudioStreamerFinished:
+            NSLog(@"finished");
+            [self nextSong];
+            break;
+            
+        case DOUAudioStreamerBuffering:
+            NSLog(@"buffering");
+            break;
+            
+        case DOUAudioStreamerError:
+            NSLog(@"error");
+            break;
+    }
     
 }
+
+
 #pragma mark - user
 
 - (void)archiverUser{

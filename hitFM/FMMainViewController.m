@@ -24,14 +24,36 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
     
     NSTimer        *progressTimer;
     NSTimer        *lyricTimer;
-    FMLyricParser  *lyrciParser;
+    FMLyricParser  *lyricParser;
     RTSpinKitView  *lyricSpiner;
     
 }
+
+@property (strong, nonatomic) IBOutlet UILabel        *channelLabel;
+@property (strong, nonatomic) IBOutlet UILabel        *songLabel;
+@property (strong, nonatomic) IBOutlet UILabel        *singerLabel;
+@property (strong, nonatomic) IBOutlet UIImageView    *albumCover;
+
+@property (strong, nonatomic) IBOutlet UIButton       *heartButton;
+@property (strong, nonatomic) IBOutlet UIButton       *unpauseButton;
+@property (strong, nonatomic) IBOutlet UIProgressView *playProgress;
+
+@property (strong, nonatomic) IBOutlet UIView         *douVisualizer;
+@property (strong, nonatomic) IBOutlet UIButton       *lyricButton;
+
+@property (strong, nonatomic) IBOutlet UITableView    *lyricTable;
+
+@property (unsafe_unretained,nonatomic, getter=isPaused)BOOL           paused;
+
+@property (strong, nonatomic) void (^networkFailHandler)(AFHTTPRequestOperation*,NSError*);
+@property (strong, nonatomic) void (^fetchLyricSuccessHandler)(LyricType type);
+
 @end
 
 @implementation FMMainViewController
 
+
+#pragma mark - 生命周期
 
 - (void)viewDidLoad {
     [super viewDidLoad];
@@ -41,14 +63,14 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
     [self initSWReveal];
     [self initControls];
     [self initDouVisualizer];
-    [self initNetwokingErrorHandler];
     [self initLyricView];
-    [self initNetwokingGetLyricSuccessHandler ];
-    //player
-    _player = [[FMPlayer alloc]init];
-    [_player addObserver:self forKeyPath:@"currentSong" options:NSKeyValueObservingOptionNew context:SongKeyKVO];
-    [_player addObserver:self forKeyPath:@"currentChannel" options:NSKeyValueObservingOptionNew context:ChannelKeyKVO];
-    [_player startAfterLauchWithErrorHandler:self.networkFailHandler];
+    
+    //改成了在getter里初始化
+    //[self initNetwokingErrorHandler];
+    //[self initNetwokingGetLyricSuccessHandler];
+    
+    //init player and play
+    [self initPlayerAndStartPlaying];
     
     
     
@@ -56,22 +78,30 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
 
 - (void)viewWillAppear:(BOOL)animated{
     [super viewWillAppear:animated];
-    progressTimer = [NSTimer scheduledTimerWithTimeInterval:1.0 target:self selector:@selector(updateProgress) userInfo:nil repeats:YES];
+    
+    // 设置更新歌曲进度的Timer
+    progressTimer = [NSTimer scheduledTimerWithTimeInterval:1.0
+                                                     target:self
+                                                   selector:@selector(updateProgress)
+                                                   userInfo:nil
+                                                    repeats:YES];
+    //远程控制中心
+    [[UIApplication sharedApplication]beginReceivingRemoteControlEvents];
+    [self becomeFirstResponder];
 
 }
 
 - (void)viewDidAppear:(BOOL)animated
 {
-    //远程控制中心
+    
     [super viewDidAppear:animated];
-    [[UIApplication sharedApplication]beginReceivingRemoteControlEvents];
-    [self becomeFirstResponder];
 }
 
 - (void)viewWillDisappear:(BOOL)animated
 {
+    // 取消更新歌曲进度的Timer
     [progressTimer invalidate];
-
+    // 停止接受远程控制事件
     [[UIApplication sharedApplication] endReceivingRemoteControlEvents];
     [self resignFirstResponder];
     [super viewWillDisappear:animated];
@@ -84,16 +114,50 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
     return YES;
 }
 
-
 - (void)didReceiveMemoryWarning {
     [super didReceiveMemoryWarning];
     // Dispose of any resources that can be recreated.
 }
 
 
+#pragma mark - background playing
 
-#pragma mark - SWRevealView setting
+- (void)setupBackgroundSession{
+    AVAudioSession *session = [AVAudioSession sharedInstance];
+    [session setCategory:AVAudioSessionCategoryPlayback error:nil];
+    [session setActive:YES error:nil];
+    
+}
 
+#pragma mark - 播放器
+
+- (void)initPlayerAndStartPlaying{
+    
+    _player = [[FMPlayer alloc]init];
+    // 观察当前歌曲和当前频道
+    // 发生改变时切换播放
+    [_player addObserver:self
+              forKeyPath:@"currentSong"
+                 options:NSKeyValueObservingOptionNew
+                 context:SongKeyKVO];
+    
+    [_player addObserver:self
+              forKeyPath:@"currentChannel"
+                 options:NSKeyValueObservingOptionNew
+                 context:ChannelKeyKVO];
+    
+    // 开始播放
+    // 如果出现网络错误，根据 networkFailHandler 处理
+    [_player startAfterLauchWithErrorHandler:self.networkFailHandler];
+}
+
+
+#pragma mark - 右边抽屉设置 SWRevealView setting
+
+/**
+ *  设置右边抽屉大小 和 宽度
+ *  添加打开和关闭右边抽屉的手势
+ */
 - (void)initSWReveal{
 
     [self.revealViewController setRightViewRevealDisplacement:20.0f];
@@ -107,28 +171,34 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
     [self.revealViewController rightRevealToggleAnimated:YES];
 }
 
-#pragma mark - init Controls
+#pragma mark - 控件初始化 init Controls
 
+/**
+ *  初始化各控件
+ */
 - (void)initControls{
     
+    // 唱片封面 外观设置
     self.albumCover.clipsToBounds = YES;
     self.albumCover.layer.cornerRadius = self.albumCover.bounds.size.height/2.0f;
     self.albumCover.layer.borderWidth = 2.0f;
-    self.unpauseButton.layer.cornerRadius = self.unpauseButton.bounds.size.height/2.0;
     
-    [self initAlbumCoverAction];
-
-}
-
-- (void)initAlbumCoverAction{
-    
+    // 为唱片封面添加一个单击事件
+    // 当单击后，播放暂停，显示继续播放按钮
     [self.albumCover setUserInteractionEnabled:YES];
-    UITapGestureRecognizer *oneTap = [[UITapGestureRecognizer alloc]initWithTarget:self action:@selector(albumCoverTapped)];
+    UITapGestureRecognizer *oneTap = [[UITapGestureRecognizer alloc]
+                                      initWithTarget:self
+                                              action:@selector(albumCoverTapped)];
     [oneTap setNumberOfTapsRequired:1];
     [self.albumCover addGestureRecognizer:oneTap];
+
+    // unpauseButton是覆盖在唱片封面上的一个按钮
+    // 当播放暂停时显示 提供继续播放的动作
+    self.unpauseButton.layer.cornerRadius = self.unpauseButton.bounds.size.height/2.0;
     
 }
 
+// 唱片封面单击事件
 - (void)albumCoverTapped{
     if ([_player isPaused]) {
         return;
@@ -138,98 +208,279 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
     }
 }
 
-
+#pragma mark - Douban的音波视图
+/**
+ *  douVisualizer是一个UIView 在xib中添加 
+ *  用来作为douban音波视图的父视图显示
+ */
 - (void)initDouVisualizer{
 
-    DOUAudioVisualizer *visualizer = [[DOUAudioVisualizer alloc]initWithFrame:CGRectMake(0, 0, CGRectGetWidth([self.douVisualizer bounds]), CGRectGetHeight([self.douVisualizer bounds]))];
-    [visualizer setBackgroundColor:[UIColor colorWithRed:239.0 / 255.0 green:244.0 / 255.0 blue:240.0 / 255.0 alpha:0.2]];
-   // visualizer.center = self.douVisualizer.center;
+    DOUAudioVisualizer *visualizer = [[DOUAudioVisualizer alloc]initWithFrame:
+                                      CGRectMake(0,
+                                                 0,
+                                                 CGRectGetWidth([self.douVisualizer bounds]),
+                                                 CGRectGetHeight([self.douVisualizer bounds]))];
+    
+    [visualizer setBackgroundColor:[UIColor colorWithRed:239.0 / 255.0
+                                                   green:244.0 / 255.0
+                                                    blue:240.0 / 255.0
+                                                   alpha:0.2]];
     [self.douVisualizer addSubview:visualizer];
 }
 
+
+#pragma mark - 歌词显示视图 初始化以及其他
+
+/**
+ *  歌词视图
+ *  提供歌词显示 
+ *  点击歌词Button后显示
+ *  点击视图背景后关闭
+ */
 - (void)initLyricView{
 
+    // 1.添加一个模糊背景
     UIBlurEffect *blurEffect = [UIBlurEffect effectWithStyle:UIBlurEffectStyleLight];
     UIVisualEffectView *blurEffectView = [[UIVisualEffectView alloc] initWithEffect:blurEffect];
     blurEffectView.frame = self.lyricTable.frame;
     
     //blurEffectView.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    
     self.lyricTable.backgroundView = blurEffectView;
     
-    UITapGestureRecognizer *oneTap = [[UITapGestureRecognizer alloc]initWithTarget:self action:@selector(hideLyric)];
+    
+    // 2.添加一个单击关闭的手势动作
+    UITapGestureRecognizer *oneTap = [[UITapGestureRecognizer alloc]initWithTarget:self
+                                                                            action:@selector(hideLyric)];
     [oneTap setNumberOfTapsRequired:1];
     [self.lyricTable addGestureRecognizer:oneTap];
     
-    //
+    // 3.外观设置
     UIEdgeInsets contentInset = self.lyricTable.contentInset;
     contentInset.top = 50;
     [self.lyricTable setContentInset:contentInset];
     
-    //lyric parser
-    if (lyrciParser == nil) {
-        lyrciParser = [[FMLyricParser alloc]init];
-        lyricTimer = [NSTimer scheduledTimerWithTimeInterval:0.1f target:self selector:@selector(updateLyric) userInfo:nil repeats:YES];
+    // lyric parser
+    // 歌词解析器
+    // 歌词解析器 负责：
+    //    1. 请求歌词
+    //    2. 解析歌词
+    //    3. 为当前歌词视图提供数据和代理
+    if (lyricParser == nil) {
+        lyricParser = [[FMLyricParser alloc]init];
+    
+        // 歌词滚动Timer设置
+        // 这个Timer负责更新歌词显示
+        lyricTimer = [NSTimer scheduledTimerWithTimeInterval:0.1f
+                                                      target:self
+                                                    selector:@selector(updateLyric)
+                                                    userInfo:nil
+                                                     repeats:YES];
         [lyricTimer setFireDate:[NSDate distantFuture]];
+        
+        self.lyricTable.delegate = lyricParser;
+        self.lyricTable.dataSource = lyricParser;
     }
     
     
-    self.lyricTable.delegate = lyrciParser;
-    self.lyricTable.dataSource = lyrciParser;
-
-}
-
-
-#pragma mark - background playing
-
-- (void)setupBackgroundSession{
-    AVAudioSession *session = [AVAudioSession sharedInstance];
-    [session setCategory:AVAudioSessionCategoryPlayback error:nil];
-    [session setActive:YES error:nil];
     
 }
+
+
+/**
+ *  <#Description#>
+ */
+- (void)initGetLyricSuccessHandler{
+    
+    
+}
+
+
+/**
+ *  更新当前歌词
+ *  每句歌词都有一个时间戳 存放于FMLyricParser的timeArray中
+ *  通过播放器获取当前播放时间
+ *  通过播放时间查询时间戳，如果当前播放时间 > timeArray[index]的时间 且< timeArray[nextIndex]的时间
+ *  即为当前应显示的歌词
+ */
+- (void)updateLyric{
+    
+    //播放暂停则返回
+    if ([self.player isPaused]) {
+        return;
+    }
+    
+    NSTimeInterval currentTime = self.player.currentTime;
+    
+    // 歌词解析器中提供了一个 startIndex的属性
+    // 以标示当前阶段开始查询的索引 以避免每次都重新迭代
+    // 初始化为0
+    for (NSInteger index = [lyricParser startIndex]; index < [[lyricParser timeArray]count]; index++) {
+        
+        
+        // 下一个时间戳索引
+        NSInteger nextIndex = index+1;
+        // 索引未越界 但是当前时间大于下一个时间戳
+        // 即下一句歌词的时间戳也已过时
+        // 这种情况出现在，用户在播放了很久才开始查看歌词，或者查看歌词过程中关闭又重新点开
+        if (nextIndex < [lyricParser.timeArray count] && currentTime >= [[lyricParser timeArray][nextIndex]doubleValue]) {
+            continue;
+        }
+        
+        
+        // 找到匹配时间戳
+        if (currentTime >= [[lyricParser timeArray][index]doubleValue]) {
+            
+            // 如果是第一次尝试就成功，将下一次的开始索引设置为当前索引的后一位
+            if (lyricParser.startIndex == index) {
+                lyricParser.startIndex = index+1;
+            }
+            // 否则下次的开始索引为当前索引
+            else{
+                [lyricParser setStartIndex:index];
+            }
+            
+            // 高亮歌词视图的当前索引值的歌词
+            [lyricParser setHighlightIndex:index];
+            NSIndexPath *indexPath = [NSIndexPath indexPathForRow:index inSection:0];
+            [self.lyricTable reloadData];
+            [self.lyricTable scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionMiddle animated:YES];
+            
+            break;
+        }
+    }
+    
+}
+
+/**
+ *  点击歌词按钮后显示歌词视图
+ *
+ *  @param sender <#sender description#>
+ */
+- (IBAction)showLyric:(id)sender {
+    
+    
+    if (lyricParser.currentSong == nil || lyricParser.currentSong != _player.currentSong){
+        [self getNewLyric];
+        [self.lyricTable setHidden:NO];
+        
+    }
+    else{
+        [self.lyricTable setHidden:NO];
+        [self startLyricScrolling];
+        
+    }
+    
+}
+
+/**
+ *  获取新歌词
+ */
+- (void)getNewLyric{
+    
+    [self showLyricLoadingSpinner];
+    [self pauseLyricScrolling];
+    
+    [lyricParser getLyric:_player.currentSong WithSuccess:self.fetchLyricSuccessHandler];
+    
+}
+
+- (void)startLyricScrolling{
+    [lyricTimer setFireDate:[NSDate date]];
+}
+
+- (void)pauseLyricScrolling{
+    [lyricTimer setFireDate:[NSDate distantFuture]];
+}
+
+- (void)showLyricLoadingSpinner{
+    
+    if (lyricSpiner == nil) {
+        lyricSpiner = [[RTSpinKitView alloc] initWithStyle:RTSpinKitViewStyleWave
+                                                     color:[UIColor colorWithRed:207/255.0
+                                                                           green:169/255.0
+                                                                            blue:114/255.0
+                                                                           alpha:1.0]];
+        lyricSpiner.center = [[[self lyricTable]backgroundView ]center];
+        [[self lyricTable] addSubview:lyricSpiner];
+        [lyricSpiner setHidesWhenStopped:YES];
+    }
+    
+    [lyricSpiner startAnimating];
+    
+}
+
+- (void)hideLyricLoadingSpinner{
+    
+    [lyricSpiner stopAnimating];
+}
+
+
+- (void)hideLyric{
+    [self.lyricTable setHidden:YES];
+    [self pauseLyricScrolling];
+    
+}
+
+
+
+
 
 #pragma mark - Network handle
 
-- (void)initNetwokingErrorHandler{
-    
-    __weak __typeof__(self) weakSelf = self;
-    self.networkFailHandler = ^void(AFHTTPRequestOperation *operation, NSError *error){
+- (void (^)(LyricType))fetchLyricSuccessHandler{
+    if (_fetchLyricSuccessHandler== nil) {
         
-        NSString* message = [NSString stringWithFormat:@"错误码:%d,%@",[error code],[error localizedDescription]];
-        UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"失败" message:message preferredStyle:UIAlertControllerStyleAlert];
-        UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"ok" style:UIAlertActionStyleCancel handler:nil];
-        [alert addAction:cancelAction];
-        [weakSelf presentViewController:alert animated:YES completion:nil];
-        
-//        if(weakSelf.player.currentSong == nil){
-//            [weakSelf.unpauseButton setHidden:NO];
-//        }
-        if (![weakSelf.player isPlaying] ) {
-            NSLog(@"is playing");
-           [weakSelf.unpauseButton setHidden:NO];
-        }
-        
+        __weak __typeof__(self) weakSelf = self;
+        _fetchLyricSuccessHandler = ^void(LyricType type){
+            
+            [weakSelf.lyricTable reloadData];
+            [weakSelf hideLyricLoadingSpinner];
+            //type：normal 有时间戳 可滚动
+            //type: no time line 无时间戳 不可滚动 直接显示
+            if (type == LyricNormal) {
+                [weakSelf startLyricScrolling];
+            }
+        };
 
-    };
+    }
     
-    
+    return _fetchLyricSuccessHandler;
+}
+
+- (void (^)(AFHTTPRequestOperation *, NSError *))networkFailHandler{
+    if (_networkFailHandler == nil) {
+        
+        /**
+         *  初始化网络错误的处理块
+         *  出现网络请求失败则present一个UIAlertController给出提示信息
+         */
+        __weak __typeof__(self) weakSelf = self;
+        self.networkFailHandler = ^void(AFHTTPRequestOperation *operation, NSError *error){
+            
+            NSString* message = [NSString stringWithFormat:@"错误码:%ld,%@",(long)[error code],[error localizedDescription]];
+            UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"失败" message:message preferredStyle:UIAlertControllerStyleAlert];
+            UIAlertAction *cancelAction = [UIAlertAction actionWithTitle:@"ok" style:UIAlertActionStyleCancel handler:nil];
+            [alert addAction:cancelAction];
+            [weakSelf presentViewController:alert animated:YES completion:nil];
+            
+            //        if(weakSelf.player.currentSong == nil){
+            //            [weakSelf.unpauseButton setHidden:NO];
+            //        }
+            if (![weakSelf.player isPlaying] ) {
+                [weakSelf.unpauseButton setHidden:NO];
+            }
+            
+            
+        };
+    }
+    return _networkFailHandler;
 }
 
 
-- (void)initNetwokingGetLyricSuccessHandler{
-    
-    __weak __typeof__(self) weakSelf = self;
-    self.getLyricSuccessHandler = ^void(LyricType type){
-        
-        [weakSelf.lyricTable reloadData];
-        [weakSelf hideLyricLoadingSpinner];
-        if (type == LyricNormal) {
-            [weakSelf startLyricScrolling];
-        }
-    };
 
-}
+
+
+
 
 #pragma mark - Navigation
 /*
@@ -270,6 +521,8 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
         [self.unpauseButton setHidden:YES];
         [progressTimer setFireDate:[NSDate date]];
         [lyricTimer setFireDate:[NSDate date]];
+        //继续播放
+        //重新设置播放中心的播放进度时间条
         NSDictionary * dict = [[MPNowPlayingInfoCenter defaultCenter] nowPlayingInfo];
         NSMutableDictionary *mutableDict = [dict mutableCopy];
         [mutableDict setObject:[NSNumber numberWithFloat:[_player currentTime]] forKey:MPNowPlayingInfoPropertyElapsedPlaybackTime];
@@ -305,66 +558,7 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
         [self.heartButton setSelected:!isSelected];
     }
 }
-- (IBAction)showLyric:(id)sender {
-    
-    
-    if (lyrciParser.currentSong == nil || lyrciParser.currentSong != _player.currentSong){
-        [self getNewLyric];
-        [self.lyricTable setHidden:NO];
 
-    }
-    else{
-        [self.lyricTable setHidden:NO];
-        [self startLyricScrolling];
-        
-    }
-    
-}
-
-- (void)hideLyric{
-    [self.lyricTable setHidden:YES];
-    [self pauseLyricScrolling];
-    
-}
-
-
-- (void)getNewLyric{
-    
-    [self showLyricLoadingSpinner];
-    [self pauseLyricScrolling];
-    
-    [lyrciParser getLyric:_player.currentSong WithSuccess:self.getLyricSuccessHandler];
-    
-    
-    
-}
-
-- (void)startLyricScrolling{
-    [lyricTimer setFireDate:[NSDate date]];
-}
-
-- (void)pauseLyricScrolling{
-    [lyricTimer setFireDate:[NSDate distantFuture]];
-}
-
-- (void)showLyricLoadingSpinner{
-    
-    if (lyricSpiner == nil) {
-        lyricSpiner = [[RTSpinKitView alloc] initWithStyle:RTSpinKitViewStyleWave color:[UIColor colorWithRed:207/255.0 green:169/255.0 blue:114/255.0 alpha:1.0]];
-        lyricSpiner.center = [[[self lyricTable]backgroundView ]center];
-
-    }
-   
-    [lyricSpiner startAnimating];
-    [[self lyricTable] addSubview:lyricSpiner];
-}
-
-- (void)hideLyricLoadingSpinner{
-    if (lyricSpiner != nil) {
-        [lyricSpiner stopAnimating];
-        [lyricSpiner removeFromSuperview];
-    }
-}
 
 - (void)switchChannel{
     [_player nextSong];
@@ -374,20 +568,26 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
 
 
 - (void)showAlert{
-    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"红心" message:@"需要登录以使用添加红心功能。" preferredStyle:UIAlertControllerStyleActionSheet];
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:@"红心"
+                                                                   message:@"需要登录以使用添加红心功能。"
+                                                            preferredStyle:UIAlertControllerStyleActionSheet];
     
-    UIAlertAction *cancel = [UIAlertAction actionWithTitle:@"暂不登录" style:UIAlertActionStyleCancel handler:^void(UIAlertAction * _Nonnull action)
-    {
-        NSLog(@"%@ handled",action);
-    }];
+    UIAlertAction *cancel = [UIAlertAction actionWithTitle:@"暂不登录"
+                                                     style:UIAlertActionStyleCancel
+                                                   handler:^void(UIAlertAction * _Nonnull action){
+                                                       NSLog(@"%@ handled",action);
+                                                   }];
     [alert addAction:cancel];
     
-    UIAlertAction *login = [UIAlertAction actionWithTitle:@"去登录" style:UIAlertActionStyleDefault handler:^(UIAlertAction * _Nonnull action)
-    {
-        UIStoryboard* sb = [UIStoryboard storyboardWithName:@"Main" bundle:[NSBundle mainBundle]];
-        UIViewController *vc = [sb instantiateViewControllerWithIdentifier:@"test"];
-        [self presentViewController:vc animated:YES completion:nil];
+    UIAlertAction *login = [UIAlertAction actionWithTitle:@"去登录"
+                                                    style:UIAlertActionStyleDefault
+                                                  handler:^(UIAlertAction * _Nonnull action){
+            //handler
+            UIStoryboard* sb = [UIStoryboard storyboardWithName:@"Main" bundle:[NSBundle mainBundle]];
+            UIViewController *vc = [sb instantiateViewControllerWithIdentifier:@"test"];
+            [self presentViewController:vc animated:YES completion:nil];
     }];
+    
     [alert addAction:login];
     [self presentViewController:alert animated:YES completion:nil];
 }
@@ -446,45 +646,6 @@ static void *ChannelKeyKVO = &ChannelKeyKVO;
     //NSLog(@"%f",_player.currentTime);
 }
 
-
-- (void)updateLyric{
-    
-    if ([self.player isPaused]) {
-        return;
-    }
-    
-    NSTimeInterval newTime = self.player.streamer.currentTime;
-    
-    for (int index = [lyrciParser startIndex]; index < [[lyrciParser timeArray]count]; index++) {
-        
-        
-        NSInteger nextIndex = index+1;
-        if (nextIndex < [lyrciParser.timeArray count] && newTime >= [[lyrciParser timeArray][nextIndex]doubleValue]) {
-            continue;
-        }
-        
-        
-        if (newTime >= [[lyrciParser timeArray][index]doubleValue]) {
-            
-           
-            if (lyrciParser.startIndex == index) {
-                lyrciParser.startIndex = index+1;
-            }else{
-                 [lyrciParser setStartIndex:index];
-            }
-            
-            [lyrciParser setHighlightIndex:index];
-            NSIndexPath *indexPath = [NSIndexPath indexPathForRow:index inSection:0];
-            [self.lyricTable reloadData];
-            [self.lyricTable scrollToRowAtIndexPath:indexPath atScrollPosition:UITableViewScrollPositionMiddle animated:YES];
-            
-            break;
-        }
-    }
-    
-}
-
-#pragma mark - Lyric Table View delegate and datasource
 
 
 #pragma mark - remote controll & info center

@@ -32,7 +32,7 @@
 //        "is_dj" = 0;
 //        "is_new_user" = 0;
 //        "is_pro" = 0;
-//        name = Lolo;
+//        name = xxxx;
 //        "play_record" =         {
 //            banned = 7;
 //            "fav_chls_count" = 0;
@@ -40,7 +40,7 @@
 //            played = 7606;
 //        };
 //        "third_party_info" = "<null>";
-//        uid = hitlolo;
-//        url = "http://www.douban.com/people/hitlolo/";
+//        uid = xxxxx;
+//        url = "xxxxxxxxxx";
 //    };
 //}
